@@ -1,0 +1,32 @@
+{
+  "name": "consistent-hash-lb",
+  "version": "1.0.0",
+  "description": "Consistent Hashing based HTTP Load Balancer built in Node.js",
+  "main": "src/server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test src/*.test.js",
+    "benchmark": "node loadtest/performance.js",
+    "distribution": "node loadtest/distribution.js"
+  },
+  "keywords": [
+    "consistent-hashing",
+    "load-balancer",
+    "distributed-systems",
+    "backend",
+    "nodejs"
+  ],
+  "author": "Swayam Kumar",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^5.2.1",
+    "http-proxy": "^1.18.1"
+  },
+  "devDependencies": {
+    "autocannon": "^8.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
