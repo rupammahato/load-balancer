@@ -181,6 +181,32 @@ Metrics (Prometheus text exposition format):
 curl http://localhost:8080/metrics
 ```
 
+## Dashboard
+
+`dashboard/` is a live visualization of the real ring — not a mockup.
+It polls `/debug/ring` every 2.5s and reflects actual state: real
+vnode positions, health-check-driven failover, and backends
+added/removed through the admin API in real time.
+
+```bash
+cd dashboard
+npm install
+npm run dev
+```
+
+Requires the load balancer running at `http://localhost:8080` (override
+with `VITE_LB_URL`). Open the printed local URL, click **Start
+Simulation**, then:
+
+- **Generate Keys** creates a batch of random keys client-side.
+- **Route Keys** resolves them against the real ring (`/debug/route`)
+  and draws each key's hash position with a line to its backend —
+  re-run it after adding/removing a backend to see the **Moved Keys**
+  stat demonstrate consistent hashing's core property (removing/adding
+  one backend only remaps ~1/N of keys, not all of them).
+- **Add Backend** / **Remove Backend** call the admin API directly;
+  the ring, stats, and event log update from the next poll.
+
 ## Measured Results
 
 ### Unit Test
@@ -239,7 +265,6 @@ whereas this project performs lookups in `O(log R)` using binary search.
 - No TLS termination
 - Single load balancer instance
 - Admin API (`POST`/`DELETE /backends`) has no authentication
-- Dashboard UI exists but isn't wired to the live backend yet
 
 ## Future Improvements
 
@@ -247,7 +272,6 @@ whereas this project performs lookups in `O(log R)` using binary search.
 - Docker & Docker Compose
 - Kubernetes deployment
 - Horizontal load balancer clustering
-- Wire the dashboard to `/debug/ring` and the admin API
 
 ## Interview Talking Points
 

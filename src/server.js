@@ -112,7 +112,29 @@ function sendJson(res, statusCode, body) {
     res.end(JSON.stringify(body, null, 2));
 }
 
+// Debug/admin/metrics endpoints are meant to be called from a
+// browser-based tool (the dashboard) running on a different origin
+// during development. No auth here either, same posture as the rest
+// of this API — see the README.
+const CORS_PATHS = [/^\/debug\//, /^\/metrics$/, /^\/backends\b/];
+
+function isCorsPath(url) {
+    return CORS_PATHS.some(pattern => pattern.test(url));
+}
+
 async function requestHandler(req, res) {
+
+    if (isCorsPath(req.url)) {
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
+        res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+        if (req.method === "OPTIONS") {
+            res.writeHead(204);
+            res.end();
+            return;
+        }
+    }
 
     if (req.url === "/debug/ring") {
 
@@ -125,8 +147,37 @@ async function requestHandler(req, res) {
             ringSize: ring.getRingSize(),
             routingStrategy: config.routingKeyStrategy,
             backends: [...registry.backendMap.values()],
-            activeBackends: healthyBackends
+            activeBackends: healthyBackends,
+            vnodes: ring.getRingSnapshot()
         });
+
+        return;
+    }
+
+    if (req.url.startsWith("/debug/route")) {
+
+        const { searchParams } = new URL(req.url, "http://localhost");
+        const keys = (searchParams.get("keys") || "")
+            .split(",")
+            .map(key => key.trim())
+            .filter(Boolean);
+
+        if (keys.length === 0) {
+            sendJson(res, 400, { error: "Provide at least one key via ?keys=a,b,c" });
+            return;
+        }
+
+        try {
+            const routes = keys.map(key => ({
+                key,
+                hash: ring.hashFn(key),
+                backend: ring.getNode(key)
+            }));
+
+            sendJson(res, 200, { routes });
+        } catch (err) {
+            sendJson(res, 503, { error: err.message });
+        }
 
         return;
     }
