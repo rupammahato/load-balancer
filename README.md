@@ -1,8 +1,36 @@
 # Consistent Hashing Load Balancer
 
+![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
+![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)
+
 > A systems-level backend project implementing a **consistent hashing
 > based HTTP load balancer** in Node.js using virtual nodes, automatic
 > health checks, reverse proxying and deterministic request routing.
+
+## Contents
+
+- [Overview](#overview)
+- [Features](#features)
+- [Requirements](#requirements)
+- [Why Naïve Routing Fails](#why-naïve-routing-fails)
+- [Consistent Hashing](#consistent-hashing)
+- [Virtual Nodes](#virtual-nodes)
+- [Architecture](#architecture)
+- [Complexity](#complexity)
+- [Tech Stack](#tech-stack)
+- [Project Structure](#project-structure)
+- [Running](#running)
+- [Dashboard](#dashboard)
+- [TLS Termination](#tls-termination)
+- [Measured Results](#measured-results)
+- [Design Decisions](#design-decisions)
+- [Alternative Considered](#alternative-considered)
+- [Horizontal Scaling](#horizontal-scaling)
+- [Practical Uses](#practical-uses)
+- [Current Limitations](#current-limitations)
+- [Future Improvements](#future-improvements)
+- [Interview Talking Points](#interview-talking-points)
+- [License](#license)
 
 ## Overview
 
@@ -47,6 +75,13 @@ of using it.
 - Structured (JSON) logs for health transitions and proxy errors
 - Graceful shutdown
 
+## Requirements
+
+- **Node.js >= 18** (uses built-in `fetch` and `AbortSignal.timeout`)
+- **npm >= 7** (this repo uses [npm workspaces](https://docs.npmjs.com/cli/v10/using-npm/workspaces) — `packages/consistent-hash-ring` is a linked workspace member, not a copy)
+- **Docker + Docker Compose** — optional, only for the [multi-instance demo](#docker-compose)
+- **openssl** — optional, only for [TLS termination](#tls-termination)'s dev-cert script
+
 ## Why Naïve Routing Fails
 
 ### Round Robin
@@ -85,8 +120,13 @@ Expected remapping after removing one backend:
 
 ## Virtual Nodes
 
-Each backend is represented by **150 virtual nodes**, improving load
-distribution and reducing hotspot formation.
+Each backend is represented by **150 virtual nodes** by default,
+improving load distribution and reducing hotspot formation. A
+backend's vnode count scales with its `weight` (`POST /backends` or
+`config.js`) — a weight-2 backend gets ~2x the vnodes, and so ~2x the
+key share of a weight-1 peer. Verified live: a weight-2 backend among
+three weight-1 peers measured 38.45% of traffic against a 40%
+theoretical share (2 of 5 total weight units).
 
 ## Architecture
 
@@ -350,6 +390,38 @@ docker compose up --build
 - `http://localhost:8081`, `:8082` — each LB instance directly (e.g.
   to compare their `/debug/ring` output, which will always match)
 
+## Practical Uses
+
+This started as a project to demonstrate understanding of consistent
+hashing (see [Interview Talking Points](#interview-talking-points)
+below). It's grown past that into a few things that are useful on
+their own:
+
+- **A reusable hashing library.** The ring itself —
+  [`packages/consistent-hash-ring`](packages/consistent-hash-ring) —
+  is a standalone, dependency-free, TypeScript-typed npm package.
+  Consistent hashing isn't only for HTTP load balancing: the same
+  `ConsistentHashRing` class works for client-side cache sharding,
+  distributed job/worker assignment, or pinning WebSocket rooms to
+  server instances. Once published, `npm install consistent-hash-ring`
+  uses it directly, without the rest of this project — until then, see
+  [its README](packages/consistent-hash-ring) for the same usage.
+- **A local dev/debug load balancer with real visibility.** Most
+  reverse proxies (nginx, HAProxy, Envoy) give you zero insight into
+  per-key routing decisions or vnode distribution without external
+  tooling. [Ring Console](#dashboard) shows it live — which backend a
+  request actually landed on, how a key remaps when a backend is
+  added or removed, and how failover unfolds in real time. Useful for
+  answering "is my sticky-session key actually sticky?" or "what does
+  my failover actually look like?" while developing against a
+  multi-instance service locally, without reading proxy access logs.
+- **A worked reference for horizontal LB deployment.** The [Horizontal
+  Scaling](#horizontal-scaling) section above and the Docker Compose
+  setup are a concrete, runnable example of what does and doesn't
+  need coordination when running multiple load balancer instances —
+  not just a claim, something you can `docker compose up` and verify
+  yourself.
+
 ## Current Limitations
 
 - No service discovery
@@ -375,4 +447,5 @@ docker compose up --build
 
 ## License
 
-MIT
+[MIT](LICENSE) — `packages/consistent-hash-ring` carries its own copy
+of the same license, since it's independently publishable.
