@@ -16,6 +16,14 @@ are placed onto the same hash ring. Removing one backend only
 redistributes approximately **1/N** of the keys rather than the entire
 keyspace.
 
+The ring implementation itself is a standalone package —
+[`packages/consistent-hash-ring`](packages/consistent-hash-ring) — with
+zero dependencies on the rest of this project. It's useful anywhere you
+need to deterministically map keys onto a changing set of nodes, not
+just HTTP load balancing: a sharded cache, a distributed job queue,
+WebSocket room assignment. This repo is one real, fully worked example
+of using it.
+
 ## Features
 
 - Consistent Hash Ring
@@ -125,6 +133,8 @@ number of keys
 
 ```text
 consistent-hash-lb/
+├── packages/
+│   └── consistent-hash-ring/   (standalone, publishable — the ring itself)
 ├── src/
 ├── backends/
 ├── dashboard/
@@ -133,7 +143,7 @@ consistent-hash-lb/
 ├── docker/
 ├── Dockerfile
 ├── docker-compose.yml
-├── package.json
+├── package.json                (npm workspaces root)
 └── README.md
 ```
 
@@ -142,6 +152,12 @@ consistent-hash-lb/
 ```bash
 npm install
 ./scripts/start-demo.sh
+```
+
+Run every test (the ring package and the load balancer):
+
+```bash
+npm run test:all
 ```
 
 Performance benchmark:

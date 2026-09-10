@@ -20,7 +20,7 @@ const https = require("https");
 const fs = require("fs");
 
 const config = require("./config");
-const ConsistentHashRing = require("./ring");
+const ConsistentHashRing = require("consistent-hash-ring");
 const { createProxyHandler } = require("./proxy");
 const { startHealthChecks } = require("./healthcheck");
 const {

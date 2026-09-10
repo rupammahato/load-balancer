@@ -6,7 +6,7 @@ const {
     validateStartupBackends,
     createBackendRegistry
 } = require("./backends");
-const ConsistentHashRing = require("./ring");
+const ConsistentHashRing = require("consistent-hash-ring");
 
 function fakeHealthChecker() {
     const added = [];

@@ -4,9 +4,13 @@
   "description": "Consistent Hashing based HTTP Load Balancer built in Node.js",
   "main": "src/server.js",
   "type": "commonjs",
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "start": "node src/server.js",
     "test": "node --test src/*.test.js",
+    "test:all": "npm test --workspaces --if-present && npm test",
     "benchmark": "node loadtest/performance.js",
     "distribution": "node loadtest/distribution.js"
   },
@@ -20,6 +24,7 @@
   "author": "Rupam Mahato",
   "license": "MIT",
   "dependencies": {
+    "consistent-hash-ring": "^1.0.0",
     "http-proxy": "^1.18.1"
   },
   "devDependencies": {

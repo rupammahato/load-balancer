@@ -6,10 +6,10 @@
  * This module implements a consistent hashing ring using
  * virtual nodes (vnodes).
  *
- * Both backend servers and request keys are hashed into the
- * same circular hash space.
+ * Both nodes and keys are hashed into the same circular hash
+ * space.
  *
- * Request routing:
+ * Routing:
  *
  *      hash(key)
  *          |
@@ -74,12 +74,12 @@ class ConsistentHashRing {
     }
 
     /**
-     * Add one physical backend.
+     * Add one node to the ring.
      *
-     * Each backend is represented by many virtual nodes
-     * spread around the ring. A backend with weight 2 gets
-     * twice the vnodes (and roughly twice the traffic share)
-     * of a backend with weight 1.
+     * Each node is represented by many virtual nodes spread
+     * around the ring. A node with weight 2 gets twice the
+     * vnodes (and roughly twice the key share) of a node with
+     * weight 1.
      */
     addNode(nodeId, weight = 1) {
         const vnodeCount = Math.max(1, Math.round(this.vnodeCount * weight));
@@ -99,7 +99,7 @@ class ConsistentHashRing {
     }
 
     /**
-     * Remove every vnode belonging to a backend.
+     * Remove every vnode belonging to a node.
      */
     removeNode(nodeId) {
         this.ring = this.ring.filter(
@@ -108,7 +108,7 @@ class ConsistentHashRing {
     }
 
     /**
-     * Find which backend owns a given key.
+     * Find which node owns a given key.
      *
      * Binary search finds the first vnode whose hash
      * is greater than or equal to the key hash.
@@ -161,7 +161,7 @@ class ConsistentHashRing {
     }
 
     /**
-     * Route many keys and count how many each backend owns.
+     * Route many keys and count how many each node owns.
      */
     getDistribution(sampleKeys) {
         const distribution = {};
@@ -177,14 +177,14 @@ class ConsistentHashRing {
     }
 
     /**
-     * Helper for debugging.
+     * Total virtual node count currently on the ring.
      */
     getRingSize() {
         return this.ring.length;
     }
 
     /**
-     * Helper for tests.
+     * A copy of every {hash, nodeId} vnode entry, sorted by hash.
      */
     getRingSnapshot() {
         return [...this.ring];

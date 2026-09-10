@@ -1,0 +1,33 @@
+{
+  "name": "consistent-hash-ring",
+  "version": "1.0.0",
+  "description": "Dependency-free consistent hashing ring with weighted virtual nodes, for sharding, caching, and load balancing.",
+  "main": "index.js",
+  "type": "commonjs",
+  "files": [
+    "index.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test index.test.js"
+  },
+  "keywords": [
+    "consistent-hashing",
+    "hash-ring",
+    "sharding",
+    "load-balancing",
+    "distributed-systems",
+    "caching"
+  ],
+  "author": "Rupam Mahato",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rupammahato/load-balancer.git",
+    "directory": "packages/consistent-hash-ring"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

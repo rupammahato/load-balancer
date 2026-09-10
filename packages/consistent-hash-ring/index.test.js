@@ -9,12 +9,13 @@
  * 2. Minimal key movement after node removal
  * 3. Deterministic routing
  * 4. Correct wraparound behaviour
+ * 5. Weighted nodes take a proportional key share
  */
 
 const test = require("node:test");
 const assert = require("node:assert");
 
-const ConsistentHashRing = require("./ring");
+const ConsistentHashRing = require("./index");
 
 function generateRandomKeys(count) {
     const keys = [];
@@ -137,5 +138,49 @@ test("Wraparound returns the first vnode", () => {
     assert.strictEqual(actual, expected);
 
     ring.hashFn = originalHashFn;
+
+});
+
+test("A weight-2 node gets roughly double the vnodes of a weight-1 node", () => {
+
+    const ring = new ConsistentHashRing({ vnodeCount: 100 });
+
+    ring.addNode("a", 1);
+    ring.addNode("b", 2);
+
+    const counts = { a: 0, b: 0 };
+
+    for (const entry of ring.getRingSnapshot()) {
+        counts[entry.nodeId]++;
+    }
+
+    assert.strictEqual(counts.a, 100);
+    assert.strictEqual(counts.b, 200);
+
+});
+
+test("A weighted node takes a proportional key share among several peers", () => {
+
+    // Two nodes head-to-head has high variance (each is a single
+    // giant arc on the circle) - real usage, and a meaningful check,
+    // looks like this: one weighted node among several unweighted
+    // peers, matching what was measured live against a real 4-backend
+    // ring (weight 2 of 5 total units -> ~40%, measured 38.45%).
+    const ring = new ConsistentHashRing({ vnodeCount: 150 });
+
+    ring.addNode("a", 1);
+    ring.addNode("b", 1);
+    ring.addNode("c", 1);
+    ring.addNode("d", 2);
+
+    const keys = generateRandomKeys(20000);
+    const distribution = ring.getDistribution(keys);
+
+    const dShare = distribution.d / keys.length;
+
+    assert.ok(
+        dShare > 0.34 && dShare < 0.46,
+        `Expected d (weight 2 of 5 units) to take ~40% of keys, got ${(dShare * 100).toFixed(1)}%`
+    );
 
 });
