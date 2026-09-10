@@ -45,16 +45,6 @@ const healthChecker = startHealthChecks({
 });
 
 // ------------------------------------------------------------
-// Create reverse proxy handler
-// ------------------------------------------------------------
-
-// const proxyHandler = createProxyHandler({
-//     ring,
-//     backends: config.backends,
-//     config
-// });
-
-// ------------------------------------------------------------
 // Build backend lookup map
 // ------------------------------------------------------------
 
@@ -113,7 +103,6 @@ function requestHandler(req, res) {
 // Create HTTP server
 // ------------------------------------------------------------
 
-// const server = http.createServer(proxyHandler);
 const server = http.createServer(requestHandler);
 
 server.listen(config.lbPort, () => {
@@ -126,6 +115,13 @@ server.listen(config.lbPort, () => {
     console.log(`Routing strategy  : ${config.routingKeyStrategy}`);
     console.log(`Virtual nodes     : ${config.vnodeCount}`);
     console.log(`Ring size         : ${ring.getRingSize()}`);
+
+    if (config.routingKeyStrategy === "ip") {
+        console.log(
+            "\n[warning] routing strategy is \"ip\" — clients behind the " +
+            "same NAT/CGNAT/corporate proxy will all hash to one backend."
+        );
+    }
 
     console.log("\nRegistered Backends:");
 
