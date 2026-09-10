@@ -25,6 +25,8 @@ const {
     validateStartupBackends,
     createBackendRegistry
 } = require("./backends");
+const logger = require("./logger");
+const metrics = require("./metrics");
 
 // ------------------------------------------------------------
 // Validate configuration before touching the ring
@@ -129,6 +131,24 @@ async function requestHandler(req, res) {
         return;
     }
 
+    if (req.url === "/metrics") {
+
+        const ringGauges = [
+            "# HELP lb_ring_size Current number of virtual nodes in the hash ring.",
+            "# TYPE lb_ring_size gauge",
+            `lb_ring_size ${ring.getRingSize()}`,
+            "# HELP lb_active_backends Number of backends currently in the ring.",
+            "# TYPE lb_active_backends gauge",
+            `lb_active_backends ${ring.getUniqueNodes().length}`
+        ].join("\n") + "\n";
+
+        res.writeHead(200, {
+            "Content-Type": "text/plain; version=0.0.4; charset=utf-8"
+        });
+        res.end(metrics.render() + ringGauges);
+        return;
+    }
+
     // Runtime backend registration — no auth, matching the rest of
     // this project. Don't expose this port to untrusted networks.
     if (req.url === "/backends" && req.method === "POST") {
@@ -149,7 +169,12 @@ async function requestHandler(req, res) {
             return;
         }
 
-        console.log(`[backends] registered ${result.backend.id} -> http://${result.backend.host}:${result.backend.port}`);
+        logger.info("backend registered", {
+            backendId: result.backend.id,
+            host: result.backend.host,
+            port: result.backend.port,
+            weight: result.backend.weight
+        });
         sendJson(res, 201, result.backend);
         return;
     }
@@ -164,7 +189,7 @@ async function requestHandler(req, res) {
             return;
         }
 
-        console.log(`[backends] removed ${id}`);
+        logger.info("backend removed", { backendId: id });
         sendJson(res, 200, { removed: id });
         return;
     }

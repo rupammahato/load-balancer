@@ -14,6 +14,9 @@
  * (see addBackend/removeBackend) without restarting the process.
  */
 
+const logger = require("./logger");
+const metrics = require("./metrics");
+
 function startHealthChecks({
     ring,
     backends,
@@ -28,6 +31,7 @@ function startHealthChecks({
         tracked.set(backend.id, backend);
         failureCount.set(backend.id, 0);
         healthy.set(backend.id, true);
+        metrics.setBackendHealth(backend.id, true);
     }
 
     async function checkBackend(backend) {
@@ -51,13 +55,14 @@ function startHealthChecks({
 
             if (!healthy.get(backend.id)) {
 
-                console.log(
-                    `[health] ${backend.id} recovered. Adding back to ring.`
-                );
+                logger.info("backend recovered, added back to ring", {
+                    backendId: backend.id
+                });
 
                 ring.addNode(backend.id, backend.weight ?? 1);
 
                 healthy.set(backend.id, true);
+                metrics.setBackendHealth(backend.id, true);
             }
 
         } catch (err) {
@@ -72,13 +77,15 @@ function startHealthChecks({
                 failures >= config.healthCheckFailureThreshold
             ) {
 
-                console.log(
-                    `[health] ${backend.id} marked DOWN after ${failures} consecutive failures.`
-                );
+                logger.warn("backend marked DOWN, removed from ring", {
+                    backendId: backend.id,
+                    consecutiveFailures: failures
+                });
 
                 ring.removeNode(backend.id);
 
                 healthy.set(backend.id, false);
+                metrics.setBackendHealth(backend.id, false);
 
             }
 
@@ -117,6 +124,7 @@ function startHealthChecks({
             tracked.set(backend.id, backend);
             failureCount.set(backend.id, 0);
             healthy.set(backend.id, true);
+            metrics.setBackendHealth(backend.id, true);
         },
 
         removeBackend(id) {

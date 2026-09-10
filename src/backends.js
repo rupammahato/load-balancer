@@ -9,6 +9,8 @@
  * via the admin API (POST/DELETE /backends).
  */
 
+const metrics = require("./metrics");
+
 function validateBackend(backend, existingIds) {
     const errors = [];
 
@@ -100,6 +102,7 @@ function createBackendRegistry({ ring, healthChecker, backends }) {
         backendMap.delete(id);
         ring.removeNode(id);
         healthChecker.removeBackend(id);
+        metrics.removeBackend(id);
 
         return { ok: true };
     }

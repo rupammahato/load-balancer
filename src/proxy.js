@@ -11,6 +11,9 @@
 const http = require("http");
 const httpProxy = require("http-proxy");
 
+const logger = require("./logger");
+const metrics = require("./metrics");
+
 // Reused across every proxied request so backend connections are
 // pooled instead of opened and torn down per request. Without this,
 // Node's default agent (keepAlive: false) makes every hop a fresh
@@ -112,6 +115,26 @@ function createProxyHandler({
             backend.id
         );
 
+        // Stashed for the proxy's module-level "error" handler below,
+        // which only receives (err, req, res) and otherwise has no
+        // way to know which backend the failed request was for.
+        req._lbBackendId = backend.id;
+
+        const startedAt = process.hrtime.bigint();
+
+        res.on("finish", () => {
+
+            if (res._lbErrored) {
+                return;
+            }
+
+            const durationMs =
+                Number(process.hrtime.bigint() - startedAt) / 1e6;
+
+            metrics.recordRequest(backend.id, durationMs);
+
+        });
+
         proxy.web(req, res, {
             target: `http://${backend.host}:${backend.port}`
         });
@@ -121,6 +144,18 @@ function createProxyHandler({
 }
 
 proxy.on("error", (err, req, res) => {
+
+    const backendId = req._lbBackendId;
+
+    metrics.recordError(backendId);
+
+    logger.error("proxy error", {
+        backendId,
+        errorCode: err.code,
+        errorMessage: err.message
+    });
+
+    res._lbErrored = true;
 
     if (!res.headersSent) {
 

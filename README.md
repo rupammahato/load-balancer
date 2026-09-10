@@ -34,6 +34,8 @@ keyspace.
 - Performance benchmark
 - Distribution benchmark
 - Debug endpoint (`/debug/ring`)
+- Prometheus-format metrics (`/metrics`) — per-backend request/error counters, latency histogram, health gauge
+- Structured (JSON) logs for health transitions and proxy errors
 - Graceful shutdown
 
 ## Why Naïve Routing Fails
@@ -173,6 +175,12 @@ curl -X DELETE http://localhost:8080/backends/backend-4
 > project. Don't expose the load balancer's port to an untrusted
 > network without adding one.
 
+Metrics (Prometheus text exposition format):
+
+```bash
+curl http://localhost:8080/metrics
+```
+
 ## Measured Results
 
 ### Unit Test
@@ -236,7 +244,6 @@ whereas this project performs lookups in `O(log R)` using binary search.
 ## Future Improvements
 
 - Gossip-based membership
-- Metrics (Prometheus)
 - Docker & Docker Compose
 - Kubernetes deployment
 - Horizontal load balancer clustering
