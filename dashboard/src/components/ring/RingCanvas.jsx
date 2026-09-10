@@ -1,11 +1,11 @@
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { polarToCartesian, hashToAngle, pickLabelAngles } from "../../utils/geometry";
 import { backendColor } from "../../utils/colors";
 
 const CENTER = 300;
 const RING_RADIUS = 210;
 
-function RingCanvas({ vnodes = [], backends = [], keyRoutes = [], status = "connecting" }) {
+function RingCanvas({ vnodes = [], backends = [], keyRoutes = [], livePulses = [], status = "connecting" }) {
 
     if (status === "connecting") {
         return <CanvasMessage text="Connecting to load balancer…" />;
@@ -35,11 +35,11 @@ function RingCanvas({ vnodes = [], backends = [], keyRoutes = [], status = "conn
                     cy={CENTER}
                     r={RING_RADIUS}
                     fill="none"
-                    stroke="#334155"
-                    strokeWidth="3"
+                    stroke="var(--color-console-line-strong)"
+                    strokeWidth="2"
                 />
 
-                <circle cx={CENTER} cy={CENTER} r="5" fill="#38bdf8" />
+                <circle cx={CENTER} cy={CENTER} r="4" fill="var(--color-console-accent)" />
 
                 {vnodes.map((vnode, i) => {
                     const { x, y } = polarToCartesian(
@@ -53,7 +53,7 @@ function RingCanvas({ vnodes = [], backends = [], keyRoutes = [], status = "conn
                             cy={y}
                             r="2"
                             fill={backendColor(vnode.nodeId)}
-                            opacity="0.55"
+                            opacity="0.5"
                         />
                     );
                 })}
@@ -72,17 +72,18 @@ function RingCanvas({ vnodes = [], backends = [], keyRoutes = [], status = "conn
                             <circle
                                 cx={x}
                                 cy={y}
-                                r="14"
+                                r="13"
                                 fill={backendColor(backend.id)}
-                                stroke="#030712"
+                                stroke="var(--color-console-bg)"
                                 strokeWidth="4"
                             />
                             <text
                                 x={x}
-                                y={y - 24}
+                                y={y - 22}
                                 textAnchor="middle"
-                                fill="#e2e8f0"
-                                fontSize="13"
+                                fill="var(--color-console-ink)"
+                                fontFamily="var(--font-mono)"
+                                fontSize="12"
                             >
                                 {backend.id}
                             </text>
@@ -90,6 +91,7 @@ function RingCanvas({ vnodes = [], backends = [], keyRoutes = [], status = "conn
                     );
                 })}
 
+                {/* Simulated routing (Generate/Route Keys): persistent diamond + line */}
                 {keyRoutes.map(route => {
                     const keyPos = polarToCartesian(
                         CENTER, CENTER, RING_RADIUS, hashToAngle(route.hash)
@@ -116,7 +118,7 @@ function RingCanvas({ vnodes = [], backends = [], keyRoutes = [], status = "conn
                                 y2={targetPos.y}
                                 stroke={color}
                                 strokeWidth="1"
-                                opacity="0.35"
+                                opacity="0.3"
                             />
                             <rect
                                 x={keyPos.x - 5}
@@ -124,13 +126,40 @@ function RingCanvas({ vnodes = [], backends = [], keyRoutes = [], status = "conn
                                 width="10"
                                 height="10"
                                 fill={color}
-                                stroke="#030712"
+                                stroke="var(--color-console-bg)"
                                 strokeWidth="1.5"
                                 transform={`rotate(45 ${keyPos.x} ${keyPos.y})`}
                             />
                         </motion.g>
                     );
                 })}
+
+                {/* Real traffic: an ephemeral radar-style pulse per request, fades and expands */}
+                <AnimatePresence>
+                    {livePulses.map(pulse => {
+                        const pos = polarToCartesian(
+                            CENTER, CENTER, RING_RADIUS, hashToAngle(pulse.hash)
+                        );
+                        const color = pulse.backendId
+                            ? backendColor(pulse.backendId)
+                            : "var(--color-console-bad)";
+
+                        return (
+                            <motion.circle
+                                key={pulse.id}
+                                cx={pos.x}
+                                cy={pos.y}
+                                fill="none"
+                                stroke={color}
+                                strokeWidth={2}
+                                initial={{ r: 3, opacity: 1 }}
+                                animate={{ r: 18, opacity: 0 }}
+                                exit={{ opacity: 0 }}
+                                transition={{ duration: 1.1, ease: "easeOut" }}
+                            />
+                        );
+                    })}
+                </AnimatePresence>
 
             </svg>
 
@@ -142,11 +171,11 @@ function RingCanvas({ vnodes = [], backends = [], keyRoutes = [], status = "conn
 
 function Legend({ backends }) {
     return (
-        <div className="flex flex-wrap gap-x-5 gap-y-2 justify-center text-sm text-slate-300">
+        <div className="flex flex-wrap gap-x-5 gap-y-2 justify-center font-mono text-xs text-console-ink-muted">
             {backends.map(backend => (
                 <div key={backend.id} className="flex items-center gap-2">
                     <span
-                        className="w-3 h-3 rounded-full inline-block"
+                        className="w-2.5 h-2.5 rounded-full inline-block"
                         style={{ backgroundColor: backendColor(backend.id) }}
                     />
                     {backend.id}
@@ -160,8 +189,8 @@ function Legend({ backends }) {
 function CanvasMessage({ text, sub }) {
     return (
         <div className="flex flex-col items-center justify-center h-full text-center gap-2 px-8">
-            <p className="text-slate-300 text-lg">{text}</p>
-            {sub && <p className="text-slate-500 text-sm font-mono">{sub}</p>}
+            <p className="text-console-ink-muted text-lg font-display">{text}</p>
+            {sub && <p className="text-console-ink-faint text-sm font-mono">{sub}</p>}
         </div>
     );
 }

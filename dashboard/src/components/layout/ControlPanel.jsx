@@ -1,18 +1,17 @@
 import { useState } from "react";
-import GlassCard from "../common/GlassCard";
+import Panel from "../common/Panel";
 
 const buttonClass = `
-    w-full
-    rounded-xl
-    bg-slate-800
-    py-3
-    transition
-    hover:enabled:bg-cyan-500
-    disabled:opacity-40
-    disabled:cursor-not-allowed
+    w-full border border-console-line py-2.5 font-mono text-xs uppercase tracking-wide
+    text-console-ink-muted transition
+    hover:enabled:border-console-accent hover:enabled:text-console-accent
+    disabled:opacity-30 disabled:cursor-not-allowed
 `;
 
-const inputClass = "w-full rounded-lg bg-slate-950 border border-slate-700 px-3 py-2 text-sm";
+const inputClass =
+  "w-full border border-console-line bg-console-bg px-2.5 py-1.5 text-sm text-console-ink font-mono focus:border-console-accent focus:outline-none";
+
+const labelClass = "block text-[11px] uppercase tracking-wide text-console-ink-faint";
 
 function ControlPanel({
   backends = [],
@@ -48,25 +47,27 @@ function ControlPanel({
   }
 
   return (
-    <GlassCard className="p-6 h-full">
-      <h2 className="text-xl font-semibold mb-6">Controls</h2>
-
-      <div className="space-y-4">
+    <Panel title="Controls" className="h-full">
+      <div className="space-y-3 p-4">
         <button className={buttonClass} disabled={busy} onClick={() => toggle("add")}>
-          Add Backend
+          + Add Backend
         </button>
 
         {openForm === "add" && (
-          <form onSubmit={submitAdd} className="space-y-2 rounded-lg bg-slate-950/60 p-3">
-            <label className="block text-xs text-slate-400">
+          <form onSubmit={submitAdd} className="space-y-2 border border-console-line bg-console-bg/60 p-3">
+            <label className={labelClass}>
               Port (dummy backend must be running here)
-              <input className={inputClass} value={port} onChange={e => setPort(e.target.value)} />
+              <input className={`${inputClass} mt-1`} value={port} onChange={e => setPort(e.target.value)} />
             </label>
-            <label className="block text-xs text-slate-400">
+            <label className={labelClass}>
               Weight
-              <input className={inputClass} value={weight} onChange={e => setWeight(e.target.value)} />
+              <input className={`${inputClass} mt-1`} value={weight} onChange={e => setWeight(e.target.value)} />
             </label>
-            <button type="submit" disabled={busy} className="w-full rounded-lg bg-cyan-500 py-2 text-sm disabled:opacity-40">
+            <button
+              type="submit"
+              disabled={busy}
+              className="w-full border border-console-accent bg-console-accent/10 py-1.5 font-mono text-xs uppercase tracking-wide text-console-accent disabled:opacity-30"
+            >
               Register
             </button>
           </form>
@@ -77,19 +78,25 @@ function ControlPanel({
           disabled={busy || backends.length === 0}
           onClick={() => toggle("remove")}
         >
-          Remove Backend
+          − Remove Backend
         </button>
 
         {openForm === "remove" && (
-          <form onSubmit={submitRemove} className="space-y-2 rounded-lg bg-slate-950/60 p-3">
+          <form onSubmit={submitRemove} className="space-y-2 border border-console-line bg-console-bg/60 p-3">
             <select className={inputClass} value={removeId} onChange={e => setRemoveId(e.target.value)}>
               {backends.map(b => <option key={b.id} value={b.id}>{b.id}</option>)}
             </select>
-            <button type="submit" disabled={busy} className="w-full rounded-lg bg-red-500/80 py-2 text-sm disabled:opacity-40">
+            <button
+              type="submit"
+              disabled={busy}
+              className="w-full border border-console-bad bg-console-bad/10 py-1.5 font-mono text-xs uppercase tracking-wide text-console-bad disabled:opacity-30"
+            >
               Remove
             </button>
           </form>
         )}
+
+        <div className="pt-2 border-t border-console-line" />
 
         <button className={buttonClass} disabled={busy} onClick={onGenerateKeys}>
           Generate Keys
@@ -103,7 +110,7 @@ function ControlPanel({
           Reset
         </button>
       </div>
-    </GlassCard>
+    </Panel>
   );
 }
 

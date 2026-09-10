@@ -1,27 +1,25 @@
-import GlassCard from "../common/GlassCard";
+import Panel from "../common/Panel";
 
-function StatsPanel({ healthyBackends = 0, virtualNodes = 0, keys = 0, movedKeys = 0 }) {
+function StatsPanel({ healthyBackends = 0, virtualNodes = 0, keys = 0, movedKeys = 0, reqPerSec = 0 }) {
   const stats = [
     ["Healthy Backends", healthyBackends],
     ["Virtual Nodes", virtualNodes],
+    ["Live Req/s", reqPerSec],
     ["Keys", keys],
     ["Moved Keys", movedKeys],
   ];
 
   return (
-    <GlassCard className="p-6 h-full">
-      <h2 className="text-xl font-semibold mb-6">Statistics</h2>
-
-      <div className="space-y-5">
+    <Panel title="Statistics" className="h-full">
+      <div className="divide-y divide-console-line">
         {stats.map(([label, value]) => (
-          <div key={label}>
-            <p className="text-slate-400">{label}</p>
-
-            <p className="text-3xl font-bold mt-1 font-mono tabular-nums">{value}</p>
+          <div key={label} className="flex items-baseline justify-between px-4 py-3">
+            <p className="text-xs uppercase tracking-wide text-console-ink-faint">{label}</p>
+            <p className="font-mono text-2xl font-medium tabular-nums text-console-ink">{value}</p>
           </div>
         ))}
       </div>
-    </GlassCard>
+    </Panel>
   );
 }
 

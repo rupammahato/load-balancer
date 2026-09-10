@@ -13,6 +13,7 @@ const httpProxy = require("http-proxy");
 
 const logger = require("./logger");
 const metrics = require("./metrics");
+const trafficFeed = require("./trafficFeed");
 
 // Reused across every proxied request so backend connections are
 // pooled instead of opened and torn down per request. Without this,
@@ -73,10 +74,11 @@ function createProxyHandler({
     return (req, res) => {
 
         let backendId;
+        let routingKey;
 
         try {
 
-            const routingKey = getRoutingKey(req, config);
+            routingKey = getRoutingKey(req, config);
 
             backendId = ring.getNode(routingKey);
 
@@ -117,8 +119,10 @@ function createProxyHandler({
 
         // Stashed for the proxy's module-level "error" handler below,
         // which only receives (err, req, res) and otherwise has no
-        // way to know which backend the failed request was for.
+        // way to know which backend/key the failed request was for.
         req._lbBackendId = backend.id;
+        req._lbRoutingKey = routingKey;
+        req._lbRoutingHash = ring.hashFn(routingKey);
 
         const startedAt = process.hrtime.bigint();
 
@@ -132,6 +136,17 @@ function createProxyHandler({
                 Number(process.hrtime.bigint() - startedAt) / 1e6;
 
             metrics.recordRequest(backend.id, durationMs);
+
+            trafficFeed.publish({
+                time: new Date().toISOString(),
+                backendId: backend.id,
+                routingKey,
+                hash: req._lbRoutingHash,
+                method: req.method,
+                path: req.url,
+                statusCode: res.statusCode,
+                durationMs
+            });
 
         });
 
@@ -156,6 +171,18 @@ proxy.on("error", (err, req, res) => {
     });
 
     res._lbErrored = true;
+
+    trafficFeed.publish({
+        time: new Date().toISOString(),
+        backendId,
+        routingKey: req._lbRoutingKey,
+        hash: req._lbRoutingHash,
+        method: req.method,
+        path: req.url,
+        statusCode: 502,
+        durationMs: null,
+        error: err.code || err.message
+    });
 
     if (!res.headersSent) {
 

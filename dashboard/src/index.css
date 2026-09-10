@@ -1,77 +1,80 @@
 @import "tailwindcss";
 
-:root {
-  color-scheme: dark;
+/*
+  "Operations console" theme: warm near-black + amber, not another
+  cyan-on-slate dashboard. Backend/series colors come from a
+  separately validated categorical palette (see utils/colors.js) and
+  never reuse this accent, so UI chrome and data identity stay two
+  distinct channels.
+*/
+@theme {
+  --color-console-bg: #0c0a08;
+  --color-console-surface: #16120d;
+  --color-console-surface-2: #201a13;
+  --color-console-surface-3: #2b2318;
+  --color-console-line: #3a2f1f;
+  --color-console-line-strong: #4d3f29;
+  --color-console-ink: #f5efe4;
+  --color-console-ink-muted: #b3a28a;
+  --color-console-ink-faint: #7a6c56;
+  --color-console-accent: #ffb454;
+  --color-console-accent-ink: #1a1206;
+  --color-console-good: #4fc389;
+  --color-console-warn: #e0b647;
+  --color-console-bad: #ff8f87;
+
+  --font-display: "Chakra Petch", sans-serif;
+  --font-body: "IBM Plex Sans", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 }
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+/*
+  Tailwind wraps its own output in `@layer theme, base, components,
+  utilities`. An unlayered rule always beats a layered one regardless
+  of specificity (CSS Cascade Layers spec) — so this reset has to live
+  in @layer base too, or it silently wins over every spacing utility
+  (mt-*, p-*, px-*, py-*) site-wide, which is exactly what happened
+  before this fix: every margin/padding utility computed to 0px.
+*/
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
 
-html,
-body,
-#root {
-  width: 100%;
-  min-height: 100%;
-}
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
 
-body {
-  font-family:
-    Inter,
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    sans-serif;
+  html,
+  body,
+  #root {
+    width: 100%;
+    min-height: 100%;
+  }
 
-  background: #030712;
-  color: #f9fafb;
+  body {
+    font-family: var(--font-body);
+    background: var(--color-console-bg);
+    color: var(--color-console-ink);
+    overflow-x: hidden;
+  }
 
-  overflow-x: hidden;
-}
+  /* Faint console grid, not a glow — a HUD backdrop, not a hero spotlight */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(245, 239, 228, 0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(245, 239, 228, 0.035) 1px, transparent 1px);
+    background-size: 36px 36px;
+    z-index: -1;
+  }
 
-/* Beautiful grid background */
-
-body::before {
-  content: "";
-
-  position: fixed;
-
-  inset: 0;
-
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-
-  background-size: 40px 40px;
-
-  z-index: -2;
-}
-
-/* Radial glow */
-
-body::after {
-  content: "";
-
-  position: fixed;
-
-  left: 50%;
-  top: 40%;
-
-  width: 900px;
-  height: 900px;
-
-  transform: translate(-50%, -50%);
-
-  background: radial-gradient(
-    circle,
-    rgba(56, 189, 248, 0.12),
-    transparent 70%
-  );
-
-  z-index: -1;
-
-  pointer-events: none;
+  ::selection {
+    background: var(--color-console-accent);
+    color: var(--color-console-accent-ink);
+  }
 }

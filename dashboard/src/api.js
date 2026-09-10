@@ -31,3 +31,7 @@ export function addBackend(backend) {
 export function removeBackend(id) {
     return request(`/backends/${encodeURIComponent(id)}`, { method: "DELETE" });
 }
+
+export function trafficStreamUrl() {
+    return `${BASE_URL}/debug/traffic/stream`;
+}

@@ -35,6 +35,7 @@ keyspace.
 - Distribution benchmark
 - Debug endpoint (`/debug/ring`)
 - Prometheus-format metrics (`/metrics`) — per-backend request/error counters, latency histogram, health gauge
+- Live traffic stream (`/debug/traffic/stream`, Server-Sent Events) — every real proxied request, pushed as it happens
 - Structured (JSON) logs for health transitions and proxy errors
 - Graceful shutdown
 
@@ -161,6 +162,12 @@ Debug endpoint:
 curl http://localhost:8080/debug/ring
 ```
 
+Live traffic stream (Server-Sent Events — every real request as it's proxied):
+
+```bash
+curl -N http://localhost:8080/debug/traffic/stream
+```
+
 Register a backend at runtime (weight is optional, defaults to 1):
 
 ```bash
@@ -187,10 +194,11 @@ curl http://localhost:8080/metrics
 
 ## Dashboard
 
-`dashboard/` is a live visualization of the real ring — not a mockup.
-It polls `/debug/ring` every 2.5s and reflects actual state: real
-vnode positions, health-check-driven failover, and backends
-added/removed through the admin API in real time.
+`dashboard/` ("Ring Console") is a live operations view of the real
+system, not a mockup and not only a simulator. It polls `/debug/ring`
+every 2.5s for topology/health state, and holds an open connection to
+`/debug/traffic/stream` (Server-Sent Events) for every real request
+the load balancer proxies, as it happens.
 
 ```bash
 cd dashboard
@@ -199,17 +207,22 @@ npm run dev
 ```
 
 Requires the load balancer running at `http://localhost:8080` (override
-with `VITE_LB_URL`). Open the printed local URL, click **Start
-Simulation**, then:
+with `VITE_LB_URL`). Open the printed local URL, click **Open
+Console**, then:
 
-- **Generate Keys** creates a batch of random keys client-side.
-- **Route Keys** resolves them against the real ring (`/debug/route`)
-  and draws each key's hash position with a line to its backend —
-  re-run it after adding/removing a backend to see the **Moved Keys**
-  stat demonstrate consistent hashing's core property (removing/adding
-  one backend only remaps ~1/N of keys, not all of them).
+- **Live Traffic** (bottom-right panel + pulses on the ring itself) is
+  *real* traffic — actual requests hitting the load balancer, not a
+  demo. Generate some with `curl http://localhost:8080/`, a browser
+  tab, or `npm run distribution`, and watch it appear.
+- **Generate Keys** / **Route Keys** is the separate simulated demo:
+  resolves synthetic keys against the real ring (`/debug/route`) and
+  draws each one's hash position with a persistent line to its
+  backend — distinct on the ring from the ephemeral live-traffic
+  pulses. Re-run **Route Keys** after adding/removing a backend to see
+  **Moved Keys** demonstrate consistent hashing's core property
+  (removing/adding one backend only remaps ~1/N of keys).
 - **Add Backend** / **Remove Backend** call the admin API directly;
-  the ring, stats, and event log update from the next poll.
+  the ring, stats, and event log update immediately.
 
 ## TLS Termination
 

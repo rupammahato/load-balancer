@@ -1,44 +1,30 @@
-const STATUS_STYLES = {
-  connected: "bg-green-500/20 text-green-400 border-green-500/30",
-  connecting: "bg-slate-500/20 text-slate-300 border-slate-500/30",
-  error: "bg-red-500/20 text-red-400 border-red-500/30",
+const STATUS_DOT = {
+  connected: "bg-console-good",
+  connecting: "bg-console-ink-faint",
+  error: "bg-console-bad",
 };
 
 const STATUS_LABEL = {
-  connected: "Live",
-  connecting: "Connecting…",
-  error: "Disconnected",
+  connected: "LIVE",
+  connecting: "CONNECTING",
+  error: "DISCONNECTED",
 };
 
 function Navbar({ status = "connecting" }) {
   return (
-    <header
-      className="
-                flex
-                items-center
-                justify-between
-                mb-6
-            "
-    >
+    <header className="mb-6 flex items-center justify-between border-b border-console-line pb-4">
       <div>
-        <h1 className="text-3xl font-bold">Consistent Hashing Simulator</h1>
-
-        <p className="text-slate-400 mt-1">
-          Interactive Load Balancer Visualization
+        <h1 className="font-display text-2xl font-semibold tracking-wide text-console-ink">
+          Ring Console
+        </h1>
+        <p className="mt-1 text-sm text-console-ink-faint">
+          Consistent hashing load balancer — live operations view
         </p>
       </div>
 
-      <div
-        className={`
-                    rounded-full
-                    px-4
-                    py-2
-                    text-sm
-                    border
-                    ${STATUS_STYLES[status]}
-                `}
-      >
-        ● {STATUS_LABEL[status]}
+      <div className="flex items-center gap-2 border border-console-line px-3 py-1.5 font-mono text-xs tracking-wide text-console-ink-muted">
+        <span className={`h-1.5 w-1.5 rounded-full ${STATUS_DOT[status]}`} />
+        {STATUS_LABEL[status]}
       </div>
     </header>
   );

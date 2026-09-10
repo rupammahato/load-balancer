@@ -3,12 +3,15 @@ import Navbar from "../components/layout/Navbar";
 import ControlPanel from "../components/layout/ControlPanel";
 import StatsPanel from "../components/layout/StatsPanel";
 import EventLog from "../components/layout/EventLog";
-import GlassCard from "../components/common/GlassCard";
+import TrafficFeed from "../components/traffic/TrafficFeed";
+import Panel from "../components/common/Panel";
 import RingCanvas from "../components/ring/RingCanvas";
 import * as api from "../api";
 
 const POLL_INTERVAL_MS = 2500;
 const MAX_EVENTS = 30;
+const MAX_TRAFFIC_EVENTS = 40;
+const PULSE_LIFETIME_MS = 1200;
 const KEYS_PER_BATCH = 24;
 
 function timestamp() {
@@ -23,6 +26,11 @@ function SimulatorPage() {
   const [movedKeys, setMovedKeys] = useState(0);
   const [events, setEvents] = useState([]);
   const [busy, setBusy] = useState(false);
+
+  const [trafficEvents, setTrafficEvents] = useState([]);
+  const [pulses, setPulses] = useState([]);
+  const [reqPerSec, setReqPerSec] = useState(0);
+  const trafficEventsRef = useRef([]);
 
   const previousRouteByKey = useRef(new Map());
   // A ref, not state: refreshRing reads/writes it synchronously so two
@@ -64,6 +72,49 @@ function SimulatorPage() {
     const interval = setInterval(refreshRing, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [refreshRing]);
+
+  // Real traffic: a live Server-Sent Events stream of every request the
+  // load balancer actually proxies (src/trafficFeed.js), separate from
+  // the simulated Generate/Route Keys demo below.
+  useEffect(() => {
+    const source = new EventSource(api.trafficStreamUrl());
+
+    source.onmessage = (e) => {
+      let data;
+      try {
+        data = JSON.parse(e.data);
+      } catch {
+        return;
+      }
+
+      const id = `${Date.now()}-${Math.random()}`;
+      const entry = { id, receivedAt: Date.now(), ...data };
+
+      setTrafficEvents(prev => [entry, ...prev].slice(0, MAX_TRAFFIC_EVENTS));
+
+      if (data.hash !== undefined) {
+        setPulses(prev => [...prev, { id, hash: data.hash, backendId: data.backendId }]);
+        setTimeout(() => {
+          setPulses(prev => prev.filter(p => p.id !== id));
+        }, PULSE_LIFETIME_MS);
+      }
+    };
+
+    return () => source.close();
+  }, []);
+
+  useEffect(() => {
+    trafficEventsRef.current = trafficEvents;
+  }, [trafficEvents]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const count = trafficEventsRef.current.filter(e => now - e.receivedAt < 1000).length;
+      setReqPerSec(count);
+    }, 500);
+    return () => clearInterval(interval);
+  }, []);
 
   async function handleAddBackend({ port, weight }) {
     setBusy(true);
@@ -156,14 +207,17 @@ function SimulatorPage() {
         </div>
 
         <div className="col-span-7">
-          <GlassCard className="h-full flex items-center justify-center min-h-[600px] p-6">
-            <RingCanvas
-              vnodes={ring.vnodes}
-              backends={ring.backends}
-              keyRoutes={routes}
-              status={status}
-            />
-          </GlassCard>
+          <Panel bracket title="Hash Ring" className="h-full min-h-[600px] flex flex-col">
+            <div className="flex-1 flex items-center justify-center p-6">
+              <RingCanvas
+                vnodes={ring.vnodes}
+                backends={ring.backends}
+                keyRoutes={routes}
+                livePulses={pulses}
+                status={status}
+              />
+            </div>
+          </Panel>
         </div>
 
         <div className="col-span-3">
@@ -172,12 +226,14 @@ function SimulatorPage() {
             virtualNodes={ring.ringSize}
             keys={keys.length}
             movedKeys={movedKeys}
+            reqPerSec={reqPerSec}
           />
         </div>
       </div>
 
-      <div className="mt-6">
+      <div className="mt-6 grid grid-cols-2 gap-6">
         <EventLog events={events} />
+        <TrafficFeed events={trafficEvents} reqPerSec={reqPerSec} />
       </div>
     </main>
   );

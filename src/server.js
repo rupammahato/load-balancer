@@ -29,6 +29,7 @@ const {
 } = require("./backends");
 const logger = require("./logger");
 const metrics = require("./metrics");
+const trafficFeed = require("./trafficFeed");
 
 // ------------------------------------------------------------
 // Validate configuration before touching the ring
@@ -157,6 +158,28 @@ async function requestHandler(req, res) {
             backends: [...registry.backendMap.values()],
             activeBackends: healthyBackends,
             vnodes: ring.getRingSnapshot()
+        });
+
+        return;
+    }
+
+    if (req.url === "/debug/traffic/stream") {
+
+        res.writeHead(200, {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive"
+        });
+
+        const unsubscribe = trafficFeed.subscribe(event => {
+            res.write(`data: ${JSON.stringify(event)}\n\n`);
+        });
+
+        const heartbeat = setInterval(() => res.write(": ping\n\n"), 20000);
+
+        req.on("close", () => {
+            clearInterval(heartbeat);
+            unsubscribe();
         });
 
         return;
