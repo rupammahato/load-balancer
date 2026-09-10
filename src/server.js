@@ -21,6 +21,21 @@ const config = require("./config");
 const ConsistentHashRing = require("./ring");
 const { createProxyHandler } = require("./proxy");
 const { startHealthChecks } = require("./healthcheck");
+const {
+    validateStartupBackends,
+    createBackendRegistry
+} = require("./backends");
+
+// ------------------------------------------------------------
+// Validate configuration before touching the ring
+// ------------------------------------------------------------
+
+try {
+    validateStartupBackends(config.backends);
+} catch (err) {
+    console.error(`[config] ${err.message}`);
+    process.exit(1);
+}
 
 // ------------------------------------------------------------
 // Build the consistent hash ring
@@ -31,7 +46,7 @@ const ring = new ConsistentHashRing({
 });
 
 for (const backend of config.backends) {
-    ring.addNode(backend.id);
+    ring.addNode(backend.id, backend.weight ?? 1);
 }
 
 // ------------------------------------------------------------
@@ -45,14 +60,15 @@ const healthChecker = startHealthChecks({
 });
 
 // ------------------------------------------------------------
-// Build backend lookup map
+// Backend registry — backs both the startup list and the
+// runtime admin API (POST/DELETE /backends)
 // ------------------------------------------------------------
 
-const backendMap = new Map();
-
-for (const backend of config.backends) {
-    backendMap.set(backend.id, backend);
-}
+const registry = createBackendRegistry({
+    ring,
+    healthChecker,
+    backends: config.backends
+});
 
 // ------------------------------------------------------------
 // Create reverse proxy handler
@@ -60,38 +76,96 @@ for (const backend of config.backends) {
 
 const proxyHandler = createProxyHandler({
     ring,
-    backendMap,
+    backendMap: registry.backendMap,
     config
 });
 
-function requestHandler(req, res) {
+function readJsonBody(req) {
+    return new Promise((resolve, reject) => {
+        let data = "";
+
+        req.on("data", chunk => {
+            data += chunk;
+
+            if (data.length > 1e6) {
+                reject(new Error("Request body too large."));
+                req.destroy();
+            }
+        });
+
+        req.on("end", () => {
+            try {
+                resolve(data ? JSON.parse(data) : {});
+            } catch (err) {
+                reject(new Error("Invalid JSON body."));
+            }
+        });
+
+        req.on("error", reject);
+    });
+}
+
+function sendJson(res, statusCode, body) {
+    res.writeHead(statusCode, { "Content-Type": "application/json" });
+    res.end(JSON.stringify(body, null, 2));
+}
+
+async function requestHandler(req, res) {
 
     if (req.url === "/debug/ring") {
 
         const healthyBackends = ring.getUniqueNodes();
 
-        res.writeHead(200, {
-            "Content-Type": "application/json"
+        sendJson(res, 200, {
+            healthyBackends: healthyBackends.length,
+            configuredBackends: registry.backendMap.size,
+            virtualNodesPerBackend: config.vnodeCount,
+            ringSize: ring.getRingSize(),
+            routingStrategy: config.routingKeyStrategy,
+            backends: [...registry.backendMap.values()],
+            activeBackends: healthyBackends
         });
 
-        res.end(JSON.stringify({
+        return;
+    }
 
-            healthyBackends: healthyBackends.length,
+    // Runtime backend registration — no auth, matching the rest of
+    // this project. Don't expose this port to untrusted networks.
+    if (req.url === "/backends" && req.method === "POST") {
 
-            configuredBackends: config.backends.length,
+        let body;
 
-            virtualNodesPerBackend: config.vnodeCount,
+        try {
+            body = await readJsonBody(req);
+        } catch (err) {
+            sendJson(res, 400, { error: err.message });
+            return;
+        }
 
-            ringSize: ring.getRingSize(),
+        const result = registry.register(body);
 
-            routingStrategy: config.routingKeyStrategy,
+        if (!result.ok) {
+            sendJson(res, 400, { errors: result.errors });
+            return;
+        }
 
-            backends: config.backends,
+        console.log(`[backends] registered ${result.backend.id} -> http://${result.backend.host}:${result.backend.port}`);
+        sendJson(res, 201, result.backend);
+        return;
+    }
 
-            activeBackends: healthyBackends
+    if (req.url.startsWith("/backends/") && req.method === "DELETE") {
 
-        }, null, 2));
+        const id = decodeURIComponent(req.url.slice("/backends/".length));
+        const result = registry.unregister(id);
 
+        if (!result.ok) {
+            sendJson(res, 404, { errors: result.errors });
+            return;
+        }
+
+        console.log(`[backends] removed ${id}`);
+        sendJson(res, 200, { removed: id });
         return;
     }
 

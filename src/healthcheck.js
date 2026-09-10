@@ -9,6 +9,9 @@
  * from the consistent hash ring.
  *
  * When it recovers, it is automatically added back.
+ *
+ * Backends can also be registered or unregistered at runtime
+ * (see addBackend/removeBackend) without restarting the process.
  */
 
 function startHealthChecks({
@@ -17,10 +20,12 @@ function startHealthChecks({
     config
 }) {
 
+    const tracked = new Map();
     const failureCount = new Map();
     const healthy = new Map();
 
     for (const backend of backends) {
+        tracked.set(backend.id, backend);
         failureCount.set(backend.id, 0);
         healthy.set(backend.id, true);
     }
@@ -50,7 +55,7 @@ function startHealthChecks({
                     `[health] ${backend.id} recovered. Adding back to ring.`
                 );
 
-                ring.addNode(backend.id);
+                ring.addNode(backend.id, backend.weight ?? 1);
 
                 healthy.set(backend.id, true);
             }
@@ -58,7 +63,7 @@ function startHealthChecks({
         } catch (err) {
 
             const failures =
-                failureCount.get(backend.id) + 1;
+                (failureCount.get(backend.id) ?? 0) + 1;
 
             failureCount.set(backend.id, failures);
 
@@ -84,7 +89,7 @@ function startHealthChecks({
     async function checkAllBackends() {
 
         await Promise.all(
-            backends.map(checkBackend)
+            [...tracked.values()].map(checkBackend)
         );
 
     }
@@ -101,6 +106,23 @@ function startHealthChecks({
 
         stop() {
             clearInterval(interval);
+        },
+
+        /**
+         * Start tracking a backend registered at runtime.
+         * It's assumed healthy immediately (same as startup),
+         * and demoted like any other backend if checks fail.
+         */
+        addBackend(backend) {
+            tracked.set(backend.id, backend);
+            failureCount.set(backend.id, 0);
+            healthy.set(backend.id, true);
+        },
+
+        removeBackend(id) {
+            tracked.delete(id);
+            failureCount.delete(id);
+            healthy.delete(id);
         }
 
     };

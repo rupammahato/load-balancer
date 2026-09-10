@@ -77,10 +77,14 @@ class ConsistentHashRing {
      * Add one physical backend.
      *
      * Each backend is represented by many virtual nodes
-     * spread around the ring.
+     * spread around the ring. A backend with weight 2 gets
+     * twice the vnodes (and roughly twice the traffic share)
+     * of a backend with weight 1.
      */
-    addNode(nodeId) {
-        for (let i = 0; i < this.vnodeCount; i++) {
+    addNode(nodeId, weight = 1) {
+        const vnodeCount = Math.max(1, Math.round(this.vnodeCount * weight));
+
+        for (let i = 0; i < vnodeCount; i++) {
             const vnodeHash = this.hashFn(`${nodeId}#${i}`);
 
             const entry = {

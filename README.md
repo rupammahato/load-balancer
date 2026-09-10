@@ -19,12 +19,14 @@ keyspace.
 ## Features
 
 - Consistent Hash Ring
-- Virtual Nodes (150 per backend)
+- Virtual Nodes (150 per backend by default, weighted per backend)
 - Binary Search lookup (`O(log R)`)
 - Deterministic routing
-- Reverse proxy using `http-proxy`
+- Reverse proxy using `http-proxy` with a keep-alive agent
 - Automatic health checking
 - Automatic backend removal & recovery
+- Runtime backend registration (`POST`/`DELETE /backends`) — no restart required
+- Startup config validation (duplicate IDs, invalid host/port/weight)
 - Configurable routing strategy
   - Client IP
   - URL Path
@@ -153,6 +155,24 @@ Debug endpoint:
 curl http://localhost:8080/debug/ring
 ```
 
+Register a backend at runtime (weight is optional, defaults to 1):
+
+```bash
+curl -X POST http://localhost:8080/backends \
+  -H "Content-Type: application/json" \
+  -d '{"id":"backend-4","host":"localhost","port":4004,"weight":2}'
+```
+
+Remove a backend at runtime:
+
+```bash
+curl -X DELETE http://localhost:8080/backends/backend-4
+```
+
+> The admin API has no authentication, matching the rest of this
+> project. Don't expose the load balancer's port to an untrusted
+> network without adding one.
+
 ## Measured Results
 
 ### Unit Test
@@ -163,9 +183,16 @@ curl http://localhost:8080/debug/ring
 
 ### Performance Benchmark
 
-- Average Requests/sec: **2045.70**
-- Total Requests: **\~41,000 in 10 seconds**
-- Average Throughput: **\~637 KB/s**
+Re-measured with `autocannon` (20 connections, 10s) after fixing the
+reverse proxy to reuse backend connections (`keepAlive` agent) instead
+of opening a new TCP connection per request:
+
+| | Before fix | After fix |
+|---|---|---|
+| Avg req/sec | 1,369.70 | **9,255.82** |
+| Avg latency | 2,459.82 ms | **1.60 ms** |
+| Errors | 1,000 / 27,000 | **0** |
+| Throughput | 426.68 KB/s | **3,136.09 KB/s** |
 
 > Latency measurements were obtained on a local development environment
 > and may vary depending on hardware, Node.js version, and concurrent
@@ -200,20 +227,20 @@ whereas this project performs lookups in `O(log R)` using binary search.
 
 ## Current Limitations
 
-- Static backend configuration
 - No service discovery
-- No weighted virtual nodes
 - No TLS termination
 - Single load balancer instance
+- Admin API (`POST`/`DELETE /backends`) has no authentication
+- Dashboard UI exists but isn't wired to the live backend yet
 
 ## Future Improvements
 
 - Gossip-based membership
-- Weighted backends
 - Metrics (Prometheus)
 - Docker & Docker Compose
 - Kubernetes deployment
 - Horizontal load balancer clustering
+- Wire the dashboard to `/debug/ring` and the admin API
 
 ## Interview Talking Points
 
