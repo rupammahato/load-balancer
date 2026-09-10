@@ -16,6 +16,8 @@
  */
 
 const http = require("http");
+const https = require("https");
+const fs = require("fs");
 
 const config = require("./config");
 const ConsistentHashRing = require("./ring");
@@ -34,6 +36,12 @@ const metrics = require("./metrics");
 
 try {
     validateStartupBackends(config.backends);
+
+    if (Boolean(config.tlsCertPath) !== Boolean(config.tlsKeyPath)) {
+        throw new Error(
+            "TLS_CERT_PATH and TLS_KEY_PATH must both be set to enable TLS, or both left unset."
+        );
+    }
 } catch (err) {
     console.error(`[config] ${err.message}`);
     process.exit(1);
@@ -250,10 +258,30 @@ async function requestHandler(req, res) {
 }
 
 // ------------------------------------------------------------
-// Create HTTP server
+// Create HTTP(S) server
 // ------------------------------------------------------------
 
-const server = http.createServer(requestHandler);
+const tlsEnabled = Boolean(config.tlsCertPath && config.tlsKeyPath);
+
+let server;
+
+if (tlsEnabled) {
+    let tlsOptions;
+
+    try {
+        tlsOptions = {
+            cert: fs.readFileSync(config.tlsCertPath),
+            key: fs.readFileSync(config.tlsKeyPath)
+        };
+    } catch (err) {
+        console.error(`[config] Failed to read TLS cert/key: ${err.message}`);
+        process.exit(1);
+    }
+
+    server = https.createServer(tlsOptions, requestHandler);
+} else {
+    server = http.createServer(requestHandler);
+}
 
 server.listen(config.lbPort, () => {
 
@@ -261,7 +289,7 @@ server.listen(config.lbPort, () => {
     console.log(" Consistent Hashing Load Balancer");
     console.log("==========================================");
 
-    console.log(`Listening on port : ${config.lbPort}`);
+    console.log(`Listening on port : ${config.lbPort}${tlsEnabled ? " (TLS)" : ""}`);
     console.log(`Routing strategy  : ${config.routingKeyStrategy}`);
     console.log(`Virtual nodes     : ${config.vnodeCount}`);
     console.log(`Ring size         : ${ring.getRingSize()}`);

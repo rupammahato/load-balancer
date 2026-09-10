@@ -126,8 +126,12 @@ number of keys
 consistent-hash-lb/
 ├── src/
 ├── backends/
+├── dashboard/
 ├── loadtest/
 ├── scripts/
+├── docker/
+├── Dockerfile
+├── docker-compose.yml
 ├── package.json
 └── README.md
 ```
@@ -207,6 +211,20 @@ Simulation**, then:
 - **Add Backend** / **Remove Backend** call the admin API directly;
   the ring, stats, and event log update from the next poll.
 
+## TLS Termination
+
+Off by default. Enable it with a cert/key pair:
+
+```bash
+./scripts/generate-dev-cert.sh   # self-signed, local dev only
+TLS_CERT_PATH=certs/dev-cert.pem TLS_KEY_PATH=certs/dev-key.pem npm start
+```
+
+The server then speaks HTTPS only on `LB_PORT` (plain HTTP requests to
+it fail, verified: `curl` gets "Empty reply from server"). For a real
+deployment, point `TLS_CERT_PATH`/`TLS_KEY_PATH` at a CA-issued cert
+(e.g. Let's Encrypt) instead of the self-signed dev one.
+
 ## Measured Results
 
 ### Unit Test
@@ -259,19 +277,61 @@ Advantages: - No ring required - Excellent distribution
 Trade-off: - Requires evaluating every node for each lookup (`O(N)`),
 whereas this project performs lookups in `O(log R)` using binary search.
 
+## Horizontal Scaling
+
+Multiple load balancer instances need no coordination protocol to
+route identically — this was measured, not assumed (see `docker
+compose up` below):
+
+- **Routing is a pure function** of (backend list, vnode count) via
+  `hashFn`. Two instances given the same static config independently
+  build byte-identical rings and agree on every key.
+- **Health-check-driven failover converges independently.** Each
+  instance polls the same backends on its own schedule; killing a
+  backend gets it evicted from every instance's ring within one health
+  check interval, with zero inter-instance communication. Verified:
+  killing a backend under a 2-instance `docker compose` stack evicted
+  it from both instances' rings at the same time.
+- **The actual gap:** runtime admin-API changes (`POST`/`DELETE
+  /backends`) only affect the instance that received the call. A
+  backend registered via the API on `lb-1` is invisible to `lb-2` —
+  verified live, not theoretical. There's no propagation mechanism.
+
+For a multi-instance deployment today: either keep the backend list in
+static config (`BACKENDS_JSON`, identical across instances — this is
+what `docker-compose.yml` does) so it converges for free, or call the
+admin API against every instance when registering a backend at
+runtime. A gossip/anti-entropy protocol to propagate admin-API changes
+automatically is a real, substantial distributed-systems undertaking
+(failure detection, suspicion states, convergence under partition) —
+out of scope here, but this section names exactly what it would need
+to solve.
+
+### Docker Compose
+
+Demonstrates the above: 3 backends, 2 independent load balancer
+instances sharing one static `BACKENDS_JSON`, and nginx as an L4-ish
+round-robin front door across the two instances.
+
+```bash
+docker compose up --build
+```
+
+- `http://localhost:8080` — nginx, round-robins across `lb-1`/`lb-2`
+- `http://localhost:8081`, `:8082` — each LB instance directly (e.g.
+  to compare their `/debug/ring` output, which will always match)
+
 ## Current Limitations
 
 - No service discovery
-- No TLS termination
-- Single load balancer instance
-- Admin API (`POST`/`DELETE /backends`) has no authentication
+- Single load balancer instance in the default (non-Docker) setup
+- Admin API (`POST`/`DELETE /backends`) has no authentication or
+  cross-instance propagation (see Horizontal Scaling above)
 
 ## Future Improvements
 
-- Gossip-based membership
-- Docker & Docker Compose
+- Gossip/anti-entropy propagation for runtime admin-API changes
 - Kubernetes deployment
-- Horizontal load balancer clustering
 
 ## Interview Talking Points
 
