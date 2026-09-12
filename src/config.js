@@ -22,6 +22,23 @@ function parseBackendsEnv() {
     }
 }
 
+/**
+ * Alternative to BACKENDS_JSON for platforms that can only wire one
+ * value per env var (e.g. Render's Blueprint `fromService` reference
+ * gives one "host:port" string per service, not a composable JSON
+ * blob). BACKEND_1, BACKEND_2, ... each "host:port" -> backend-N.
+ */
+function parseNumberedBackendsEnv() {
+    const backends = [];
+
+    for (let i = 1; process.env[`BACKEND_${i}`]; i++) {
+        const [host, port] = process.env[`BACKEND_${i}`].split(":");
+        backends.push({ id: `backend-${i}`, host, port: Number(port) });
+    }
+
+    return backends.length > 0 ? backends : null;
+}
+
 const DEFAULT_BACKENDS = [
     {
         id: "backend-1",
@@ -47,8 +64,10 @@ const config = {
      * Override with BACKENDS_JSON (e.g. for Docker Compose, where
      * each backend is its own container reachable by service name,
      * not "localhost") — a JSON array of {id, host, port, weight?}.
+     * Or with BACKEND_1/BACKEND_2/... ("host:port" each) for platforms
+     * like Render that can only give one value per env var.
      */
-    backends: parseBackendsEnv() ?? DEFAULT_BACKENDS,
+    backends: parseBackendsEnv() ?? parseNumberedBackendsEnv() ?? DEFAULT_BACKENDS,
 
     /**
      * Number of virtual nodes per backend.
@@ -86,10 +105,12 @@ const config = {
         process.env.ROUTING_HEADER_NAME || "x-client-id",
 
     /**
-     * Load balancer port.
+     * Load balancer port. LB_PORT takes priority; PORT is the
+     * fallback since that's the convention most hosting platforms
+     * (Render, Heroku, ...) inject automatically.
      */
     lbPort:
-        Number(process.env.LB_PORT) || 8080,
+        Number(process.env.LB_PORT) || Number(process.env.PORT) || 8080,
 
     /**
      * TLS termination. Off by default — set both env vars to enable.

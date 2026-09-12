@@ -390,6 +390,23 @@ docker compose up --build
 - `http://localhost:8081`, `:8082` — each LB instance directly (e.g.
   to compare their `/debug/ring` output, which will always match)
 
+### Deploying to Render
+
+`render.yaml` deploys the load balancer + 3 backends as 4 services in
+one Blueprint (Render Dashboard → New → Blueprint, point it at this
+repo). Each backend's internal `host:port` is wired to the load
+balancer automatically via Render's `fromService` — no manual copying
+of URLs. See `BACKEND_1`/`BACKEND_2`/... in `src/config.js` if you
+need this pattern outside Render (one "host:port" value per env var,
+for platforms that can't compose a full `BACKENDS_JSON` blob).
+
+Note: **Vercel cannot run the load balancer** — it's a stateful,
+long-running process (in-memory ring, a health-check interval, SSE
+connections held open), and Vercel only runs short-lived, stateless
+functions per request. Vercel is fine for `dashboard/` (a static
+build); the load balancer itself needs a host that runs persistent
+processes, like Render.
+
 ## Practical Uses
 
 This started as a project to demonstrate understanding of consistent

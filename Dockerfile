@@ -3,7 +3,8 @@ FROM node:20-alpine
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+COPY packages/ ./packages/
+RUN npm ci --omit=dev --workspaces --include-workspace-root
 
 COPY src/ ./src/
 COPY backends/ ./backends/

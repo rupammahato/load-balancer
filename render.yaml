@@ -1,0 +1,63 @@
+# Render Blueprint — deploys the load balancer + 3 backends as 4
+# services in one flow. Import this repo on Render and it detects
+# this file automatically (Dashboard -> New -> Blueprint).
+#
+# The load balancer's BACKEND_1/2/3 env vars are wired to the other
+# services' internal host:port automatically via `fromService` — no
+# manual copy-pasting of URLs. See src/config.js's
+# parseNumberedBackendsEnv() for how these are consumed.
+#
+# Free-tier web services spin down after 15 minutes of no inbound
+# traffic. The load balancer's own health checks keep the backends
+# warm; nothing keeps the load balancer itself warm without real
+# traffic, so the first request after a quiet period will be slow
+# (cold start) — expected on the free tier, not a bug.
+
+services:
+  - name: backend-1
+    type: web
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerCommand: node backends/dummy-server.js
+    healthCheckPath: /health
+
+  - name: backend-2
+    type: web
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerCommand: node backends/dummy-server.js
+    healthCheckPath: /health
+
+  - name: backend-3
+    type: web
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerCommand: node backends/dummy-server.js
+    healthCheckPath: /health
+
+  - name: load-balancer
+    type: web
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerCommand: node src/server.js
+    healthCheckPath: /debug/ring
+    envVars:
+      - key: BACKEND_1
+        fromService:
+          name: backend-1
+          type: web
+          property: hostport
+      - key: BACKEND_2
+        fromService:
+          name: backend-2
+          type: web
+          property: hostport
+      - key: BACKEND_3
+        fromService:
+          name: backend-3
+          type: web
+          property: hostport
